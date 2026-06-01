@@ -3,6 +3,8 @@
     <div class="head-opt">
       <Icon v-perm="'account:add'" class="icon add" icon="ion:add-outline" width="23" height="23" @click="add"/>
       <Icon class="icon refresh" icon="ion:reload" width="18" height="18" @click="refresh"/>
+      <el-button v-perm="'account:add'" class="batch-btn" size="small" type="primary" @click="openBatchAdd">批量生成</el-button>
+      <el-button v-if="hasPerm('account:query')" class="batch-btn" size="small" @click="batchExportPopSecret">导出POP密钥</el-button>
     </div>
     <el-scrollbar class="scrollbar" ref="scrollbarRef">
       <div v-infinite-scroll="getAccountList" :infinite-scroll-distance="600" :infinite-scroll-immediate="false">
@@ -118,6 +120,47 @@
         <span style="font-size: 12px;color: #F56C6C" v-if="botJsError">{{ $t('verifyModuleFailed') }}</span>
       </div>
     </el-dialog>
+    <el-dialog v-model="batchAddShow" title="批量生成随机邮箱" width="520px">
+      <div class="container batch-container">
+        <div class="pop-secret-label">生成数量，单次最多200个</div>
+        <el-input-number v-model="batchAddForm.count" :min="1" :max="200" style="width: 100%" />
+        <div class="pop-secret-label">邮箱域名</div>
+        <el-select v-model="batchAddForm.suffix" style="width: 100%">
+          <el-option
+              v-for="item in domainList"
+              :key="item"
+              :label="item"
+              :value="item"
+          />
+        </el-select>
+        <div class="pop-secret-label">随机前缀长度</div>
+        <el-input-number v-model="batchAddForm.prefixLength" :min="settingStore.settings.minEmailPrefix || 6" :max="30" style="width: 100%" />
+        <div class="batch-switch-row">
+          <span>同时生成POP密钥</span>
+          <el-switch v-model="batchAddForm.generatePopSecret" />
+        </div>
+        <el-alert
+            type="warning"
+            show-icon
+            :closable="false"
+            title="批量生成后会返回 邮箱——POP密钥 文本，请立即复制或下载保存，POP密钥关闭后不能再次查看。"
+        />
+        <el-button class="btn" type="primary" @click="submitBatchAdd" :loading="batchAddLoading">开始批量生成</el-button>
+      </div>
+    </el-dialog>
+    <el-dialog v-model="batchResultShow" title="批量POP密钥导出" width="620px">
+      <el-alert
+          type="warning"
+          show-icon
+          :closable="false"
+          title="POP密钥只会在本次生成/重置时显示一次，请立即下载保存。格式：邮箱——POP密钥。"
+      />
+      <el-input class="batch-result-textarea" v-model="batchResultText" type="textarea" :rows="12" readonly />
+      <div class="batch-result-actions">
+        <el-button @click="copyBatchResult">复制</el-button>
+        <el-button type="primary" @click="downloadBatchResult">下载TXT</el-button>
+      </div>
+    </el-dialog>
     <el-dialog v-model="setNameShow" :title="$t('changeUserName')">
       <div class="container">
         <el-input v-model="accountName" type="text" :placeholder="$t('username')" autocomplete="off">
@@ -161,7 +204,9 @@ import {
   accountSetAllReceive,
   accountSetAsTop,
   accountResetPopSecret,
-  accountDeletePopSecret
+  accountDeletePopSecret,
+  accountBatchRandomAdd,
+  accountBatchResetPopSecretExport
 } from "@/request/account.js";
 import {sleep} from "@/utils/time-utils.js"
 import {isEmail} from "@/utils/verify-utils.js";
@@ -189,6 +234,16 @@ const verifyShow = ref(false)
 const setNameShow = ref(false)
 const setNameLoading = ref(false)
 const popSecretShow = ref(false)
+const batchAddShow = ref(false)
+const batchAddLoading = ref(false)
+const batchResultShow = ref(false)
+const batchResultText = ref('')
+const batchAddForm = reactive({
+  count: 10,
+  suffix: settingStore.domainList[0],
+  prefixLength: Math.max(settingStore.settings.minEmailPrefix || 6, 10),
+  generatePopSecret: true
+})
 const popSecretInfo = reactive({
   email: '',
   popSecret: '',
@@ -225,6 +280,9 @@ watch(() => accountStore.changeUserAccountName, () => {
 watch(() => settingStore.domainList, (list) => {
   if (!addForm.suffix && list.length > 0) {
     addForm.suffix = list[0]
+  }
+  if (!batchAddForm.suffix && list.length > 0) {
+    batchAddForm.suffix = list[0]
   }
 }, {immediate: true})
 
@@ -398,6 +456,84 @@ function setAsTop(account, index) {
   });
 }
 
+
+
+function openBatchAdd() {
+  batchAddForm.suffix = batchAddForm.suffix || settingStore.domainList[0]
+  batchAddForm.prefixLength = Math.max(settingStore.settings.minEmailPrefix || 6, batchAddForm.prefixLength || 10)
+  batchAddShow.value = true
+}
+
+function showBatchResult(text) {
+  batchResultText.value = text || ''
+  batchResultShow.value = true
+}
+
+function submitBatchAdd() {
+  if (!batchAddForm.suffix) {
+    ElMessage({ message: '请选择邮箱域名', type: 'error', plain: true })
+    return
+  }
+  batchAddLoading.value = true
+  accountBatchRandomAdd(
+      batchAddForm.count,
+      batchAddForm.suffix,
+      batchAddForm.prefixLength,
+      batchAddForm.generatePopSecret
+  ).then(data => {
+    batchAddShow.value = false
+    if (Array.isArray(data.created) && data.created.length > 0) {
+      accounts.unshift(...data.created)
+    }
+    userStore.refreshUserInfo()
+    showBatchResult(data.text || '')
+    ElMessage({ message: `成功生成 ${data.created?.length || 0} 个邮箱`, type: 'success', plain: true })
+  }).finally(() => {
+    batchAddLoading.value = false
+  })
+}
+
+function batchExportPopSecret() {
+  ElMessageBox.confirm(
+      '因为数据库不会保存明文POP密钥，所以批量导出会为你的邮箱重新生成POP密钥，旧POP密钥会立即失效，是否继续？',
+      '批量导出POP密钥',
+      {
+        confirmButtonText: t('confirm'),
+        cancelButtonText: t('cancel'),
+        type: 'warning'
+      }
+  ).then(() => {
+    return accountBatchResetPopSecretExport([])
+  }).then(data => {
+    accounts.forEach(item => {
+      item.hasPopSecret = true
+      const credential = data.credentials?.find(row => row.accountId === item.accountId)
+      if (credential) item.popSecretTime = credential.popSecretTime
+    })
+    showBatchResult(data.text || '')
+  })
+}
+
+async function copyBatchResult() {
+  try {
+    await navigator.clipboard.writeText(batchResultText.value)
+    ElMessage({ message: t('copySuccessMsg'), type: 'success', plain: true })
+  } catch (err) {
+    ElMessage({ message: t('copyFailMsg'), type: 'error', plain: true })
+  }
+}
+
+function downloadBatchResult() {
+  const blob = new Blob([batchResultText.value], {type: 'text/plain;charset=utf-8'})
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `pop-secret-${Date.now()}.txt`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
 
 function resetPopSecret(accountItem) {
   ElMessageBox.confirm(
@@ -621,6 +757,30 @@ path[fill="#ffdda1"] {
   color: var(--el-text-color-secondary);
 }
 
+.batch-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.batch-switch-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 10px 0;
+}
+
+.batch-result-textarea {
+  margin-top: 14px;
+}
+
+.batch-result-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+}
+
 </style>
 <style scoped lang="scss">
 .account-box {
@@ -644,6 +804,11 @@ path[fill="#ffdda1"] {
 
     .refresh {
       margin-left: 10px;
+    }
+
+    .batch-btn {
+      margin-left: 8px;
+      padding: 4px 8px;
     }
 
     .add {
