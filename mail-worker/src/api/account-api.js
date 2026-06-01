@@ -32,3 +32,14 @@ app.put('/account/setAsTop', async (c) => {
 	await accountService.setAsTop(c, await c.req.json(), userContext.getUserId(c));
 	return c.json(result.ok());
 });
+
+
+app.post('/account/popSecret/reset', async (c) => {
+	const data = await accountService.resetPopSecret(c, await c.req.json(), userContext.getUserId(c));
+	return c.json(result.ok(data));
+});
+
+app.delete('/account/popSecret/delete', async (c) => {
+	await accountService.deletePopSecret(c, c.req.query(), userContext.getUserId(c));
+	return c.json(result.ok());
+});
