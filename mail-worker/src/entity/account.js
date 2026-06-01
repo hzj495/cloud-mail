@@ -10,6 +10,9 @@ export const account = sqliteTable('account', {
 	userId: integer('user_id').notNull(),
 	allReceive: integer('all_receive').default(0).notNull(),
 	sort: integer('sort').default(0).notNull(),
+	popSecretHash: text('pop_secret_hash').notNull().default(''),
+	popSecretSalt: text('pop_secret_salt').notNull().default(''),
+	popSecretTime: text('pop_secret_time'),
 	isDel: integer('is_del').default(0).notNull(),
 });
 export default account
