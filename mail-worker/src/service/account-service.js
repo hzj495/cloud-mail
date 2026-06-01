@@ -12,6 +12,8 @@ import turnstileService from './turnstile-service';
 import roleService from './role-service';
 import { t } from '../i18n/i18n';
 import verifyRecordService from './verify-record-service';
+import saltHashUtils from '../utils/crypto-utils';
+import dayjs from 'dayjs';
 
 const accountService = {
 
@@ -103,7 +105,7 @@ const accountService = {
 		return orm(c).select().from(account).where(sql`${account.email} COLLATE NOCASE = ${email}`).get();
 	},
 
-	list(c, params, userId) {
+	async list(c, params, userId) {
 
 		let { accountId, size, lastSort } = params;
 
@@ -123,7 +125,7 @@ const accountService = {
 			lastSort = 9999999999;
 		}
 
-		return orm(c).select().from(account).where(
+		const list = await orm(c).select().from(account).where(
 			and(
 				eq(account.userId, userId),
 				eq(account.isDel, isDel.NORMAL),
@@ -138,6 +140,8 @@ const accountService = {
 			.orderBy(desc(account.sort), asc(account.accountId))
 			.limit(size)
 			.all();
+
+		return list.map(item => this.maskPopSecretTime(item));
 	},
 
 	async delete(c, params, userId) {
@@ -237,7 +241,7 @@ const accountService = {
 		const list = await orm(c).select().from(account).where(and(eq(account.userId, userId),ne(account.email,userRow.email))).limit(size).offset(num);
 		const { total } = await orm(c).select({ total: count() }).from(account).where(eq(account.userId, userId)).get();
 
-		return { list, total }
+		return { list: list.map(item => this.maskPopSecretTime(item)), total }
 	},
 
 	async physicsDelete(c, params) {
@@ -255,6 +259,73 @@ const accountService = {
 		}
 		await orm(c).update(account).set({ allReceive: accountConst.allReceive.CLOSE }).where(eq(account.userId, userId)).run();
 		await orm(c).update(account).set({ allReceive: accountRow.allReceive ? 0 : 1 }).where(eq(account.accountId, accountId)).run();
+	},
+
+
+	genPopSecret(length = 24) {
+		const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+		const values = new Uint8Array(length);
+		crypto.getRandomValues(values);
+		return Array.from(values, item => chars[item % chars.length]).join('');
+	},
+
+	maskPopSecretTime(accountRow) {
+		if (!accountRow) return accountRow;
+		accountRow.hasPopSecret = !!accountRow.popSecretHash;
+		delete accountRow.popSecretHash;
+		delete accountRow.popSecretSalt;
+		return accountRow;
+	},
+
+	async resetPopSecret(c, params, userId) {
+		const { accountId } = params;
+		const accountRow = await this.selectById(c, accountId);
+
+		if (!accountRow || accountRow.userId !== userId) {
+			throw new BizError(t('noUserAccount'));
+		}
+
+		const popSecret = this.genPopSecret(24);
+		const { salt, hash } = await saltHashUtils.hashPassword(popSecret);
+		const popSecretTime = dayjs().toISOString();
+
+		await orm(c).update(account).set({
+			popSecretHash: hash,
+			popSecretSalt: salt,
+			popSecretTime
+		}).where(and(eq(account.accountId, accountId), eq(account.userId, userId))).run();
+
+		return {
+			accountId: accountRow.accountId,
+			email: accountRow.email,
+			popSecret,
+			popSecretTime
+		};
+	},
+
+	async deletePopSecret(c, params, userId) {
+		const { accountId } = params;
+		const accountRow = await this.selectById(c, accountId);
+
+		if (!accountRow || accountRow.userId !== userId) {
+			throw new BizError(t('noUserAccount'));
+		}
+
+		await orm(c).update(account).set({
+			popSecretHash: '',
+			popSecretSalt: '',
+			popSecretTime: null
+		}).where(and(eq(account.accountId, accountId), eq(account.userId, userId))).run();
+	},
+
+	async verifyPopSecret(c, email, popSecret) {
+		if (!email || !popSecret) return null;
+		const accountRow = await this.selectByEmailIncludeDel(c, email);
+		if (!accountRow || accountRow.isDel !== isDel.NORMAL || !accountRow.popSecretHash || !accountRow.popSecretSalt) {
+			return null;
+		}
+		const ok = await saltHashUtils.verifyPassword(popSecret, accountRow.popSecretSalt, accountRow.popSecretHash);
+		return ok ? accountRow : null;
 	},
 
 	async setAsTop(c, params, userId) {
