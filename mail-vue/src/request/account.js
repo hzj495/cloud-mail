@@ -31,3 +31,11 @@ export function accountResetPopSecret(accountId) {
 export function accountDeletePopSecret(accountId) {
     return http.delete('/account/popSecret/delete', {params: {accountId}})
 }
+
+export function accountBatchRandomAdd(count, domain, prefixLength = 10, generatePopSecret = true) {
+    return http.post('/account/batchRandomAdd', {count, domain, prefixLength, generatePopSecret})
+}
+
+export function accountBatchResetPopSecretExport(accountIds = []) {
+    return http.post('/account/popSecret/batchResetExport', {accountIds})
+}
