@@ -26,6 +26,10 @@
                   <el-dropdown-menu>
                     <el-dropdown-item v-if="hasPerm('email:send')" @click="openSetName(item)">{{ $t('rename') }}</el-dropdown-item>
                     <el-dropdown-item v-if="item.accountId !== userStore.user.account.accountId" @click="setAsTop(item, index)">{{ $t('pin') }}</el-dropdown-item>
+                    <el-dropdown-item v-if="hasPerm('account:query')" @click="resetPopSecret(item)">
+                      {{ item.hasPopSecret ? '重新生成POP密钥' : '生成POP密钥' }}
+                    </el-dropdown-item>
+                    <el-dropdown-item v-if="item.hasPopSecret && hasPerm('account:query')" @click="removePopSecret(item)">删除POP密钥</el-dropdown-item>
                     <el-dropdown-item v-if="item.accountId !== userStore.user.account.accountId && hasPerm('account:delete')"
                                       @click="remove(item)">{{ $t('delete') }}
                     </el-dropdown-item>
@@ -123,6 +127,27 @@
         </el-button>
       </div>
     </el-dialog>
+    <el-dialog v-model="popSecretShow" title="POP密钥" width="520px">
+      <el-alert
+          type="warning"
+          show-icon
+          :closable="false"
+          title="请立即复制保存，POP密钥只会在生成时显示一次，关闭后不能再次查看，只能重新生成。"
+      />
+      <div class="pop-secret-box">
+        <div class="pop-secret-label">邮箱</div>
+        <el-input v-model="popSecretInfo.email" readonly />
+        <div class="pop-secret-label">POP密钥</div>
+        <el-input v-model="popSecretInfo.popSecret" readonly>
+          <template #append>
+            <el-button @click="copyPopSecret">复制</el-button>
+          </template>
+        </el-input>
+        <div class="pop-secret-tip">
+          该密钥已加密保存到数据库。后续如果你接入 POP3 网关，可以用“邮箱 + POP密钥”验证用户。
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 <script setup>
@@ -134,7 +159,9 @@ import {
   accountDelete,
   accountSetName,
   accountSetAllReceive,
-  accountSetAsTop
+  accountSetAsTop,
+  accountResetPopSecret,
+  accountDeletePopSecret
 } from "@/request/account.js";
 import {sleep} from "@/utils/time-utils.js"
 import {isEmail} from "@/utils/verify-utils.js";
@@ -161,6 +188,12 @@ const followLoading = ref(false);
 const verifyShow = ref(false)
 const setNameShow = ref(false)
 const setNameLoading = ref(false)
+const popSecretShow = ref(false)
+const popSecretInfo = reactive({
+  email: '',
+  popSecret: '',
+  popSecretTime: ''
+})
 const accountName = ref(null)
 const addRef = ref({})
 const scrollbarRef = ref({})
@@ -365,6 +398,63 @@ function setAsTop(account, index) {
   });
 }
 
+
+function resetPopSecret(accountItem) {
+  ElMessageBox.confirm(
+      accountItem.hasPopSecret ? '重新生成后，旧POP密钥会立即失效，是否继续？' : '确定为这个邮箱生成POP密钥？',
+      'POP密钥',
+      {
+        confirmButtonText: t('confirm'),
+        cancelButtonText: t('cancel'),
+        type: 'warning'
+      }
+  ).then(() => {
+    return accountResetPopSecret(accountItem.accountId)
+  }).then(data => {
+    accountItem.hasPopSecret = true
+    accountItem.popSecretTime = data.popSecretTime
+    popSecretInfo.email = data.email
+    popSecretInfo.popSecret = data.popSecret
+    popSecretInfo.popSecretTime = data.popSecretTime
+    popSecretShow.value = true
+  })
+}
+
+function removePopSecret(accountItem) {
+  ElMessageBox.confirm('删除后，当前POP密钥会立即失效，是否继续？', 'POP密钥', {
+    confirmButtonText: t('confirm'),
+    cancelButtonText: t('cancel'),
+    type: 'warning'
+  }).then(() => {
+    return accountDeletePopSecret(accountItem.accountId)
+  }).then(() => {
+    accountItem.hasPopSecret = false
+    accountItem.popSecretTime = null
+    ElMessage({
+      message: t('delSuccessMsg'),
+      type: 'success',
+      plain: true,
+    })
+  })
+}
+
+async function copyPopSecret() {
+  try {
+    await navigator.clipboard.writeText(popSecretInfo.popSecret);
+    ElMessage({
+      message: t('copySuccessMsg'),
+      type: 'success',
+      plain: true,
+    })
+  } catch (err) {
+    ElMessage({
+      message: t('copyFailMsg'),
+      type: 'error',
+      plain: true,
+    })
+  }
+}
+
 async function copyAccount(account) {
   try {
     await navigator.clipboard.writeText(account);
@@ -514,6 +604,23 @@ function submit() {
 path[fill="#ffdda1"] {
   fill: #ffdd7d;
 }
+.pop-secret-box {
+  margin-top: 14px;
+}
+
+.pop-secret-label {
+  margin: 12px 0 6px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+
+.pop-secret-tip {
+  margin-top: 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--el-text-color-secondary);
+}
+
 </style>
 <style scoped lang="scss">
 .account-box {
