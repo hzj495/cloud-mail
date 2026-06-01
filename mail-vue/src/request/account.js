@@ -23,3 +23,11 @@ export function accountSetAllReceive(accountId) {
 export function accountSetAsTop(accountId) {
     return http.put('/account/setAsTop', {accountId})
 }
+
+export function accountResetPopSecret(accountId) {
+    return http.post('/account/popSecret/reset', {accountId})
+}
+
+export function accountDeletePopSecret(accountId) {
+    return http.delete('/account/popSecret/delete', {params: {accountId}})
+}
