@@ -101,6 +101,130 @@ const accountService = {
 		return accountRow;
 	},
 
+
+	genRandomEmailPrefix(length = 10) {
+		const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+		const values = new Uint8Array(length);
+		crypto.getRandomValues(values);
+		let prefix = '';
+		for (let i = 0; i < values.length; i++) {
+			prefix += chars[values[i] % chars.length];
+		}
+		return prefix;
+	},
+
+	async buildPopSecretPatch() {
+		const popSecret = this.genPopSecret(24);
+		const { salt, hash } = await saltHashUtils.hashPassword(popSecret);
+		const popSecretTime = dayjs().toISOString();
+		return {
+			popSecret,
+			popSecretTime,
+			patch: {
+				popSecretHash: hash,
+				popSecretSalt: salt,
+				popSecretTime
+			}
+		};
+	},
+
+	async batchRandomAdd(c, params, userId) {
+		const { addEmail, manyEmail, minEmailPrefix, emailPrefixFilter } = await settingService.query(c);
+		let { count: createCount, domain, prefixLength = 10, generatePopSecret = true } = params || {};
+
+		createCount = Number(createCount);
+		prefixLength = Number(prefixLength);
+
+		if (!(addEmail === settingConst.addEmail.OPEN && manyEmail === settingConst.manyEmail.OPEN)) {
+			throw new BizError(t('addAccountDisabled'));
+		}
+
+		if (!Number.isInteger(createCount) || createCount < 1) {
+			throw new BizError('批量生成数量必须大于0');
+		}
+		if (createCount > 200) {
+			throw new BizError('单次最多批量生成200个邮箱');
+		}
+
+		domain = String(domain || '').trim();
+		if (domain.startsWith('@')) domain = domain.slice(1);
+		if (!domain || !c.env.domain.includes(domain)) {
+			throw new BizError(t('notExistDomain'));
+		}
+
+		if (!Number.isInteger(prefixLength) || prefixLength < minEmailPrefix) {
+			prefixLength = Math.max(Number(minEmailPrefix) || 6, 6);
+		}
+		if (prefixLength > 30) prefixLength = 30;
+
+		const userRow = await userService.selectById(c, userId);
+		const roleRow = await roleService.selectById(c, userRow.type);
+
+		if (userRow.email !== c.env.admin) {
+			if (roleRow.accountCount > 0) {
+				const userAccountCount = await accountService.countUserAccount(c, userId);
+				if (userAccountCount + createCount > roleRow.accountCount) {
+					throw new BizError(t('accountLimit'), 403);
+				}
+			}
+			if(!roleService.hasAvailDomainPerm(roleRow.availDomain, `x@${domain}`)) {
+				throw new BizError(t('noDomainPermAdd'),403);
+			}
+		}
+
+		const created = [];
+		const credentials = [];
+		const used = new Set();
+		let tries = 0;
+
+		while (created.length < createCount) {
+			tries++;
+			if (tries > createCount * 80) {
+				throw new BizError('随机前缀生成失败，请加大前缀长度后重试');
+			}
+
+			const prefix = this.genRandomEmailPrefix(prefixLength);
+			if (emailPrefixFilter.some(content => prefix.includes(content))) continue;
+
+			const email = `${prefix}@${domain}`;
+			if (used.has(email)) continue;
+			used.add(email);
+
+			const exist = await this.selectByEmailIncludeDel(c, email);
+			if (exist) continue;
+
+			let insertData = {
+				email,
+				userId,
+				name: prefix
+			};
+			let popSecret = '';
+			let popSecretTime = null;
+
+			if (generatePopSecret) {
+				const pop = await this.buildPopSecretPatch();
+				insertData = { ...insertData, ...pop.patch };
+				popSecret = pop.popSecret;
+				popSecretTime = pop.popSecretTime;
+			}
+
+			const row = await orm(c).insert(account).values(insertData).returning().get();
+			created.push(this.maskPopSecretTime(row));
+			credentials.push({
+				accountId: row.accountId,
+				email,
+				popSecret,
+				popSecretTime
+			});
+		}
+
+		return {
+			created,
+			credentials,
+			text: credentials.map(item => `${item.email}——${item.popSecret}`).join('\n')
+		};
+	},
+
 	selectByEmailIncludeDel(c, email) {
 		return orm(c).select().from(account).where(sql`${account.email} COLLATE NOCASE = ${email}`).get();
 	},
@@ -316,6 +440,43 @@ const accountService = {
 			popSecretSalt: '',
 			popSecretTime: null
 		}).where(and(eq(account.accountId, accountId), eq(account.userId, userId))).run();
+	},
+
+
+	async batchResetExport(c, params, userId) {
+		let { accountIds = [] } = params || {};
+		if (!Array.isArray(accountIds)) accountIds = [];
+		accountIds = accountIds.map(item => Number(item)).filter(item => Number.isInteger(item) && item > 0);
+
+		let where = and(eq(account.userId, userId), eq(account.isDel, isDel.NORMAL));
+		if (accountIds.length > 0) {
+			where = and(where, inArray(account.accountId, accountIds));
+		}
+
+		const list = await orm(c).select().from(account).where(where).orderBy(asc(account.accountId)).limit(500).all();
+		if (list.length === 0) {
+			throw new BizError('没有可导出的邮箱');
+		}
+		if (list.length > 500) {
+			throw new BizError('单次最多导出500个邮箱');
+		}
+
+		const credentials = [];
+		for (const item of list) {
+			const pop = await this.buildPopSecretPatch();
+			await orm(c).update(account).set(pop.patch).where(and(eq(account.userId, userId), eq(account.accountId, item.accountId))).run();
+			credentials.push({
+				accountId: item.accountId,
+				email: item.email,
+				popSecret: pop.popSecret,
+				popSecretTime: pop.popSecretTime
+			});
+		}
+
+		return {
+			credentials,
+			text: credentials.map(item => `${item.email}——${item.popSecret}`).join('\n')
+		};
 	},
 
 	async verifyPopSecret(c, email, popSecret) {
