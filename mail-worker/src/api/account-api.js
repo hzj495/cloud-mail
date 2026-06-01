@@ -18,6 +18,17 @@ app.post('/account/add', async (c) => {
 	return c.json(result.ok(account));
 });
 
+app.post('/account/batchRandomAdd', async (c) => {
+	const data = await accountService.batchRandomAdd(c, await c.req.json(), userContext.getUserId(c));
+	return c.json(result.ok(data));
+});
+
+app.post('/account/popSecret/batchResetExport', async (c) => {
+	const data = await accountService.batchResetExport(c, await c.req.json(), userContext.getUserId(c));
+	return c.json(result.ok(data));
+});
+
+
 app.put('/account/setName', async (c) => {
 	await accountService.setName(c, await c.req.json(), userContext.getUserId(c));
 	return c.json(result.ok());
