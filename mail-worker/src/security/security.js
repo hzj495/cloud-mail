@@ -59,10 +59,12 @@ const requirePerms = [
 	'/user/deleteAccount',
 	'/user/allAccount',
 	'/regKey/add',
+	'/regKey/batchAdd',
 	'/regKey/list',
 	'/regKey/delete',
 	'/regKey/clearNotUse',
-	'/regKey/history'
+	'/regKey/history',
+	'/regKey/export'
 ];
 
 const premKey = {
@@ -88,8 +90,8 @@ const premKey = {
 	'setting:query': ['/setting/query'],
 	'setting:set': ['/setting/set', '/setting/setBackground','/setting/deleteBackground','/setting/setBlacklist'],
 	'analysis:query': ['/analysis/echarts'],
-	'reg-key:add': ['/regKey/add'],
-	'reg-key:query': ['/regKey/list','/regKey/history'],
+	'reg-key:add': ['/regKey/add','/regKey/batchAdd'],
+	'reg-key:query': ['/regKey/list','/regKey/history','/regKey/export'],
 	'reg-key:delete': ['/regKey/delete','/regKey/clearNotUse'],
 };
 
