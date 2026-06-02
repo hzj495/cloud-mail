@@ -16,6 +16,7 @@ import saltHashUtils from '../utils/crypto-utils';
 import constant from '../const/constant';
 import { t } from '../i18n/i18n'
 import reqUtils from '../utils/req-utils';
+import { toUtc } from '../utils/date-uitil';
 import {oauth} from "../entity/oauth";
 import oauthService from "./oauth-service";
 
@@ -39,6 +40,7 @@ const userService = {
 		user.userId = userRow.userId;
 		user.sendCount = userRow.sendCount;
 		user.email = userRow.email;
+		user.expireTime = userRow.expireTime;
 		user.account = accountService.maskPopSecretTime(account);
 		user.name = account.name;
 		user.permKeys = permKeys;
@@ -53,6 +55,13 @@ const userService = {
 		return user;
 	},
 
+
+	isExpired(c, userRow) {
+		if (!userRow || !userRow.expireTime || userRow.email === c.env.admin) {
+			return false;
+		}
+		return toUtc(userRow.expireTime).isBefore(toUtc());
+	},
 
 	async resetPassword(c, params, userId) {
 
@@ -368,7 +377,7 @@ const userService = {
 
 	listByRegKeyId(c, regKeyId) {
 		return orm(c)
-			.select({email: user.email,createTime: user.createTime})
+			.select({email: user.email,createTime: user.createTime,expireTime: user.expireTime})
 			.from(user)
 			.where(eq(user.regKeyId, regKeyId))
 			.orderBy(desc(user.userId))
