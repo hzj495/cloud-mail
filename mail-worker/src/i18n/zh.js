@@ -44,7 +44,7 @@ const zh = {
 	regKeyUseCount: '使用次数不能为空',
 	emptyRegKeyExpire: '有效时间不能为空',
 	emptyRegKeyValidity: '账号有效套餐不能为空',
-	userExpired: '账号已到期，请联系管理员续期',
+	userExpired: '账号已到期，请使用新的注册码续费',
 	isExistRegKye: '注册码已存在',
 	roleNotExist: '权限身份不存在',
 	emptyRoleName: '身份名不能为空',
