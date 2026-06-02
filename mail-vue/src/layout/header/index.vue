@@ -56,7 +56,7 @@
                     {{ $t('disabled') }}
                   </el-tag>
                   <span v-else-if="accountCount && hasPerm('account:add')"
-                        style="margin-right: 5px">{{ $t('totalUserAccount', {msg: accountCount}) }}</span>
+                        style="margin-right: 5px">{{ $t('totalUserAccount', {used: usedAccountCount, total: accountCount, msg: accountCount}) }}</span>
                   <el-tag v-else-if="!accountCount && hasPerm('account:add')">{{ $t('unlimited') }}</el-tag>
                   <el-tag v-else-if="!hasPerm('account:add')">{{ $t('unauthorized') }}</el-tag>
                 </div>
@@ -97,6 +97,10 @@ const userinfoRef = ref({})
 
 const accountCount = computed(() => {
   return userStore.user.role.accountCount
+})
+
+const usedAccountCount = computed(() => {
+  return userStore.user.accountCreatedCount || 0
 })
 
 const sendType = computed(() => {
