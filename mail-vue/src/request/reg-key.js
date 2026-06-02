@@ -8,6 +8,10 @@ export function regKeyAdd(form) {
     return http.post('/regKey/add',form)
 }
 
+export function regKeyBatchAdd(form) {
+    return http.post('/regKey/batchAdd', form)
+}
+
 export function regKeyDelete(regKeyIds) {
     return http.delete('/regKey/delete?regKeyIds='+ regKeyIds)
 }
@@ -18,4 +22,8 @@ export function regKeyClearNotUse() {
 
 export function regKeyHistory(regKeyId) {
     return http.get('/regKey/history', {params:{regKeyId}})
+}
+
+export function regKeyExport(validityType) {
+    return http.get('/regKey/export', {params:{validityType}})
 }
