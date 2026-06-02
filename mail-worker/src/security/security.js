@@ -134,6 +134,10 @@ app.use('*', async (c, next) => {
 		throw new BizError(t('authExpired'), 401);
 	}
 
+	if (userService.isExpired(c, authInfo.user)) {
+		throw new BizError(t('userExpired'), 401);
+	}
+
 	const permIndex = requirePerms.findIndex(item => {
 		return path.startsWith(item);
 	});
