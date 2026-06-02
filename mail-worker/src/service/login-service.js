@@ -156,26 +156,7 @@ const loginService = {
 
 	async handleOpenRegKey(c, regKey, code) {
 
-		if (!code) {
-			throw new BizError(t('emptyRegKey'));
-		}
-
-		const regKeyRow = await regKeyService.selectByCode(c, code);
-
-		if (!regKeyRow) {
-			throw new BizError(t('notExistRegKey'));
-		}
-
-		if (regKeyRow.count <= 0) {
-			throw new BizError(t('noRegKeyCount'));
-		}
-
-		const today = toUtc().tz('Asia/Shanghai').startOf('day')
-		const expireTime = toUtc(regKeyRow.expireTime).tz('Asia/Shanghai').startOf('day');
-
-		if (expireTime.isBefore(today)) {
-			throw new BizError(t('regKeyExpire'));
-		}
+		const regKeyRow = await regKeyService.assertUsableCode(c, code);
 
 		return {
 			type: regKeyRow.roleId,
@@ -269,6 +250,65 @@ const loginService = {
 
 		await c.env.kv.put(KvConst.AUTH_INFO + userRow.userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
 		return jwt;
+	},
+
+	async renew(c, params) {
+
+		const { email, password, code } = params;
+
+		if (!email || !password) {
+			throw new BizError(t('emailAndPwdEmpty'));
+		}
+
+		if (!code) {
+			throw new BizError(t('emptyRegKey'));
+		}
+
+		if (!verifyUtils.isEmail(email)) {
+			throw new BizError(t('notEmail'));
+		}
+
+		const userRow = await userService.selectByEmailIncludeDel(c, email);
+
+		if (!userRow) {
+			throw new BizError(t('notExistUser'));
+		}
+
+		if(userRow.isDel === isDel.DELETE) {
+			throw new BizError(t('isDelUser'));
+		}
+
+		if(userRow.status === userConst.status.BAN) {
+			throw new BizError(t('isBanUser'));
+		}
+
+		if (!await cryptoUtils.verifyPassword(password, userRow.salt, userRow.password)) {
+			throw new BizError(t('IncorrectPwd'));
+		}
+
+		const regKeyRow = await regKeyService.assertUsableCode(c, code);
+		const roleRow = await roleService.selectById(c, regKeyRow.roleId);
+
+		if (!roleRow) {
+			throw new BizError(t('roleNotExist'));
+		}
+
+		if(!roleService.hasAvailDomainPerm(roleRow.availDomain, email)) {
+			throw new BizError(t('noDomainPermRegKey'),403)
+		}
+
+		const expireTime = regKeyService.computeAccountExpireTime(regKeyRow.validityType, userRow.expireTime);
+
+		await userService.renewExpireTime(c, {
+			userId: userRow.userId,
+			expireTime,
+			regKeyId: regKeyRow.regKeyId,
+			type: regKeyRow.roleId
+		});
+
+		await regKeyService.reduceCount(c, code, 1);
+
+		return { expireTime };
 	},
 
 	async logout(c, userId) {
