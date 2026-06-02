@@ -1,6 +1,7 @@
 import orm from '../entity/orm';
 import email from '../entity/email';
 import accountService from './account-service';
+import userService from './user-service';
 import BizError from '../error/biz-error';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { emailConst, isDel } from '../const/entity-const';
@@ -135,6 +136,10 @@ async function assertAccount(c, accountId, userId) {
 	if (!accountRow || accountRow.userId !== userId) {
 		throw new BizError('POP3 account not found', 404);
 	}
+	const userRow = await userService.selectById(c, userId);
+	if (!userRow || userService.isExpired(c, userRow)) {
+		throw new BizError('POP3 account expired', 401);
+	}
 	return accountRow;
 }
 
@@ -145,6 +150,10 @@ const pop3Service = {
 		const accountRow = await accountService.verifyPopSecret(c, emailAddress, popSecret);
 		if (!accountRow) {
 			throw new BizError('POP3 authentication failed', 401);
+		}
+		const userRow = await userService.selectById(c, accountRow.userId);
+		if (!userRow || userService.isExpired(c, userRow)) {
+			throw new BizError('POP3 account expired', 401);
 		}
 		return normalizeAccount(accountRow);
 	},
