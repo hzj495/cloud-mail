@@ -11,6 +11,7 @@ import app from '../hono/hono';
 const exclude = [
 	'/login',
 	'/register',
+	'/renew',
 	'/oss',
 	'/setting/websiteConfig',
 	'/webhooks',
