@@ -7,7 +7,7 @@ const en = {
 	notExistDomain: 'Email domain does not exist',
 	isDelAccount: 'This Email has been deleted',
 	isRegAccount: 'This Email is already registered',
-	accountLimit: 'Email address limit reached',
+	accountLimit: 'Cumulative email address limit reached. Deleted addresses do not free quota',
 	delMyAccount: 'Cannot delete your own email',
 	noUserAccount: 'This email does not belong to the current user',
 	usernameLengthLimit: 'Username length exceeds the limit',
