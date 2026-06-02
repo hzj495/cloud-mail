@@ -44,7 +44,7 @@ const en = {
 	regKeyUseCount: 'Usage count cannot be empty',
 	emptyRegKeyExpire: 'Valid until time cannot be empty',
 	emptyRegKeyValidity: 'Account validity plan cannot be empty',
-	userExpired: 'Account has expired. Please contact the administrator to renew.',
+	userExpired: 'Account has expired. Please renew with a new invite code.',
 	isExistRegKye: 'Invite code already exists',
 	roleNotExist: 'Role does not exist',
 	emptyRoleName: 'Role name cannot be empty',
