@@ -12,6 +12,7 @@
       <div class="container">
         <span class="form-title">{{ settingStore.settings.title }}</span>
         <span class="form-desc" v-if="show === 'login'">{{ $t('loginTitle') }}</span>
+        <span class="form-desc" v-else-if="show === 'renew'">{{ $t('renewTitle') }}</span>
         <span class="form-desc" v-else>{{ $t('regTitle') }}</span>
         <div v-show="show === 'login'">
           <el-input :class="!hideLoginDomain ? 'email-input' : ''" v-model="form.email"
@@ -48,13 +49,13 @@
             <el-avatar src="/image/linuxdo.webp" :size="18" style="margin-right: 10px" />LinuxDo
           </el-button>
         </div>
-        <div v-show="show !== 'login'">
+        <div v-show="show === 'register'">
           <el-input :class="!hideLoginDomain ? 'email-input' : ''" v-model="registerForm.email" type="text" :placeholder="$t('emailAccount')"
                     autocomplete="off">
             <template #append v-if="!hideLoginDomain">
               <div @click.stop="openSelect">
                 <el-select
-                    v-if="show !== 'login'"
+                    v-if="show === 'register'"
                     ref="mySelect"
                     v-model="suffix"
                     :placeholder="$t('select')"
@@ -98,10 +99,50 @@
             <el-avatar src="/image/linuxdo.webp" :size="18" style="margin-right: 10px" />LinuxDo
           </el-button>
         </div>
-        <template v-if="settingStore.settings.register === 0">
-          <div class="switch" @click="show = 'register'" v-if="show === 'login'">{{ $t('noAccount') }}
+        <div v-show="show === 'renew'">
+          <el-input :class="!hideLoginDomain ? 'email-input' : ''" v-model="renewForm.email"
+                    type="text" :placeholder="$t('emailAccount')" autocomplete="off">
+            <template #append v-if="!hideLoginDomain">
+              <div @click.stop="openSelect">
+                <el-select
+                    v-if="show === 'renew'"
+                    ref="mySelect"
+                    v-model="suffix"
+                    :placeholder="$t('select')"
+                    class="select"
+                >
+                  <el-option
+                      v-for="item in domainList"
+                      :key="item"
+                      :label="item"
+                      :value="item"
+                  />
+                </el-select>
+                <div style="color: var(--el-text-color-primary)">
+                  <span>{{ suffix }}</span>
+                  <Icon class="setting-icon" icon="mingcute:down-small-fill" width="20" height="20"/>
+                </div>
+              </div>
+            </template>
+          </el-input>
+          <el-input v-model="renewForm.password" :placeholder="$t('password')" type="password" autocomplete="off"/>
+          <el-input v-model="renewForm.code" :placeholder="$t('renewRegKey')" type="text" autocomplete="off"/>
+          <el-button class="btn" style="margin: 0" type="primary" @click="submitRenew" :loading="renewLoading">
+            {{ $t('renewBtn') }}
+          </el-button>
+        </div>
+        <template v-if="show === 'login'">
+          <div class="switch" @click="show = 'register'" v-if="settingStore.settings.register === 0">{{ $t('noAccount') }}
             <span>{{ $t('regSwitch') }}</span></div>
-          <div class="switch" @click="show = 'login'" v-else>{{ $t('hasAccount') }} <span>{{ $t('loginSwitch') }}</span>
+          <div class="switch" @click="show = 'renew'">{{ $t('accountExpiredQuestion') }}
+            <span>{{ $t('renewSwitch') }}</span></div>
+        </template>
+        <template v-else-if="show === 'register' && settingStore.settings.register === 0">
+          <div class="switch" @click="show = 'login'">{{ $t('hasAccount') }} <span>{{ $t('loginSwitch') }}</span>
+          </div>
+        </template>
+        <template v-else-if="show === 'renew'">
+          <div class="switch" @click="show = 'login'">{{ $t('hasAccount') }} <span>{{ $t('loginSwitch') }}</span>
           </div>
         </template>
       </div>
@@ -149,8 +190,7 @@
 <script setup>
 import router from "@/router";
 import {computed, nextTick, reactive, ref} from "vue";
-import {login} from "@/request/login.js";
-import {register} from "@/request/login.js";
+import {login, register, renew} from "@/request/login.js";
 import {websiteConfig} from "@/request/setting.js";
 import {isEmail} from "@/utils/verify-utils.js";
 import {useSettingStore} from "@/store/setting.js";
@@ -194,8 +234,14 @@ const registerForm = reactive({
   confirmPassword: '',
   code: null
 })
+const renewForm = reactive({
+  email: '',
+  password: '',
+  code: ''
+})
 const domainList = settingStore.domainList;
 const registerLoading = ref(false)
+const renewLoading = ref(false)
 suffix.value = domainList[0]
 const verifyShow = ref(false)
 let verifyToken = ''
@@ -406,6 +452,13 @@ const submit = () => {
   loginLoading.value = true
   login(email, form.password).then(async data => {
     await saveToken(data.token)
+  }).catch(res => {
+    const msg = res?.message || ''
+    if (msg.includes('到期') || msg.toLowerCase().includes('expired')) {
+      renewForm.email = form.email
+      renewForm.password = form.password
+      show.value = 'renew'
+    }
   }).finally(() => {
     loginLoading.value = false
   })
@@ -441,6 +494,67 @@ function refreshWebsiteConfig() {
   })
 }
 
+
+function submitRenew() {
+
+  if (!renewForm.email) {
+    ElMessage({
+      message: t('emptyEmailMsg'),
+      type: 'error',
+      plain: true,
+    })
+    return
+  }
+
+  const email = getFullEmail(renewForm.email);
+
+  if (!isEmail(email)) {
+    ElMessage({
+      message: t('notEmailMsg'),
+      type: 'error',
+      plain: true,
+    })
+    return
+  }
+
+  if (!renewForm.password) {
+    ElMessage({
+      message: t('emptyPwdMsg'),
+      type: 'error',
+      plain: true,
+    })
+    return
+  }
+
+  if (!renewForm.code) {
+    ElMessage({
+      message: t('emptyRegKeyMsg'),
+      type: 'error',
+      plain: true,
+    })
+    return
+  }
+
+  renewLoading.value = true
+
+  renew({
+    email,
+    password: renewForm.password,
+    code: renewForm.code
+  }).then(data => {
+    renewForm.email = ''
+    renewForm.password = ''
+    renewForm.code = ''
+    show.value = 'login'
+    ElMessage({
+      message: data?.expireTime ? `${t('renewSuccessMsg')}：${data.expireTime}` : t('renewSuccessMsg'),
+      type: 'success',
+      plain: true,
+    })
+  }).finally(() => {
+    renewLoading.value = false
+  })
+}
 
 function submitRegister() {
 
