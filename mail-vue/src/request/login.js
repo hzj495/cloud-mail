@@ -11,3 +11,6 @@ export function logout() {
 export function register(form) {
     return http.post('/register', form)
 }
+export function renew(form) {
+    return http.post('/renew', form)
+}
