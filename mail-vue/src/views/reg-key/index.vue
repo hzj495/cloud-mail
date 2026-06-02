@@ -2,6 +2,18 @@
   <div class="reg-key">
     <div class="header-actions">
       <Icon class="icon" icon="ion:add-outline" width="23" height="23" @click="openAdd"/>
+      <Icon class="icon" icon="fluent:copy-add-24-regular" width="23" height="23" @click="openBatchAdd"/>
+      <el-dropdown class="export-dropdown" trigger="click">
+        <Icon class="icon" icon="material-symbols:download-rounded" width="22" height="22"/>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item @click="exportRegKeys('month')">{{ $t('exportMonthRegKey') }}</el-dropdown-item>
+            <el-dropdown-item @click="exportRegKeys('quarter')">{{ $t('exportQuarterRegKey') }}</el-dropdown-item>
+            <el-dropdown-item @click="exportRegKeys('year')">{{ $t('exportYearRegKey') }}</el-dropdown-item>
+            <el-dropdown-item divided @click="exportRegKeys('all')">{{ $t('exportAllRegKey') }}</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
       <div class="search">
         <el-input
             v-model="params.code"
@@ -90,6 +102,39 @@
         </el-button>
       </div>
     </el-dialog>
+    <el-dialog v-model="showBatchAdd" :title="$t('batchAddRegKey')">
+      <div class="container">
+        <el-select v-model="batchForm.roleId" :placeholder="$t('roleDesc')">
+          <el-option v-for="item in roleList" :label="item.name" :value="item.roleId" :key="item.roleId"/>
+        </el-select>
+        <el-select v-model="batchForm.validityType" :placeholder="$t('accountValidity')">
+          <el-option :label="$t('validityMonth')" value="month"/>
+          <el-option :label="$t('validityQuarter')" value="quarter"/>
+          <el-option :label="$t('validityYear')" value="year"/>
+        </el-select>
+        <el-date-picker
+            v-model="batchForm.expireTime"
+            type="date"
+            :placeholder="$t('validUntil')"
+        />
+        <div class="form-row">
+          <span>{{ $t('batchCount') }}</span>
+          <el-input-number v-model="batchForm.batchCount" :min="1" :max="1000"/>
+        </div>
+        <div class="form-row">
+          <span>{{ $t('perRegKeyUseCount') }}</span>
+          <el-input-number v-model="batchForm.count" :min="1" :max="99999"/>
+        </div>
+        <div class="form-row">
+          <span>{{ $t('regKeyLength') }}</span>
+          <el-input-number v-model="batchForm.codeLength" :min="6" :max="32"/>
+        </div>
+        <el-alert :title="$t('batchRegKeyDesc')" type="info" :closable="false"/>
+        <el-button class="btn" type="primary" @click="submitBatchAdd" :loading="batchLoading"
+        >{{ $t('batchAdd') }}
+        </el-button>
+      </div>
+    </el-dialog>
     <el-dialog class="history-list" v-model="showRegKeyHistory" :title="$t('useHistory')">
       <div class="loading" :class="historyLoading ? 'loading-show' : 'loading-hide'">
         <loading/>
@@ -113,7 +158,7 @@ import loading from "@/components/loading/index.vue";
 import {useSettingStore} from "@/store/setting.js";
 import {roleSelectUse} from "@/request/role.js";
 import {useRoleStore} from "@/store/role.js";
-import {regKeyAdd, regKeyList, regKeyClearNotUse, regKeyDelete, regKeyHistory} from "@/request/reg-key.js";
+import {regKeyAdd, regKeyList, regKeyClearNotUse, regKeyDelete, regKeyHistory, regKeyBatchAdd, regKeyExport} from "@/request/reg-key.js";
 import {getTextWidth} from "@/utils/text.js";
 import dayjs from "dayjs";
 import {tzDayjs} from "@/utils/day.js";
@@ -132,7 +177,10 @@ const params = reactive({
 const {t} = useI18n()
 const roleList = reactive([])
 const addLoading = ref(false)
+const batchLoading = ref(false)
+const exportLoading = ref(false)
 const showAdd = ref(false)
+const showBatchAdd = ref(false)
 const regKeyLoading = ref(true)
 const regKeyFirst = ref(true)
 const showRegKeyHistory = ref(false)
@@ -148,6 +196,15 @@ const addForm = reactive({
   roleId: null,
   validityType: 'month',
   expireTime: null
+})
+
+const batchForm = reactive({
+  batchCount: 10,
+  count: 1,
+  roleId: null,
+  validityType: 'month',
+  expireTime: null,
+  codeLength: 8
 })
 
 const regKeyData = reactive([])
@@ -408,6 +465,160 @@ function submit() {
   })
 }
 
+function submitBatchAdd() {
+
+  if (!batchForm.roleId) {
+    ElMessage({
+      message: t('emptyRole'),
+      type: "error",
+      plain: true
+    })
+    return
+  }
+
+  if (!batchForm.validityType) {
+    ElMessage({
+      message: t('emptyValidityMsg'),
+      type: "error",
+      plain: true
+    })
+    return
+  }
+
+  if (!batchForm.expireTime) {
+    ElMessage({
+      message: t('emptyTimeMsg'),
+      type: "error",
+      plain: true
+    })
+    return
+  }
+
+  if (!batchForm.batchCount) {
+    ElMessage({
+      message: t('emptyBatchCountMsg'),
+      type: "error",
+      plain: true
+    })
+    return
+  }
+
+  if (!batchForm.count) {
+    ElMessage({
+      message: t('emptyCountMsg'),
+      type: "error",
+      plain: true
+    })
+    return
+  }
+
+  batchLoading.value = true
+  regKeyBatchAdd(batchForm).then((codes) => {
+    showBatchAdd.value = false
+    resetBatchForm()
+    ElMessage({
+      message: t('batchAddSuccessMsg', {count: codes.length}),
+      type: "success",
+      plain: true
+    })
+    getList()
+  }).finally(() => {
+    batchLoading.value = false
+  })
+}
+
+function exportRegKeys(validityType) {
+  if (exportLoading.value) {
+    return
+  }
+  exportLoading.value = true
+  regKeyExport(validityType).then((list) => {
+    if (!list || list.length === 0) {
+      ElMessage({
+        message: t('exportNoDataMsg'),
+        type: "warning",
+        plain: true
+      })
+      return
+    }
+
+    const content = buildRegKeyExportContent(list, validityType)
+    const blob = new Blob([content], {type: 'text/plain;charset=utf-8'})
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${t(getExportFileNameKey(validityType))}-${dayjs().format('YYYYMMDD-HHmmss')}.txt`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    ElMessage({
+      message: t('exportSuccessMsg'),
+      type: "success",
+      plain: true
+    })
+  }).finally(() => {
+    exportLoading.value = false
+  })
+}
+
+function buildRegKeyExportContent(list, validityType) {
+  const title = t(getExportTitleKey(validityType))
+  const lines = [
+    title,
+    `${t('exportTime')}：${dayjs().format('YYYY-MM-DD HH:mm:ss')}`,
+    `${t('exportTotal')}：${list.length}`,
+    '',
+    `${t('regKey')}----${t('accountValidity')}----${t('remainingUses')}----${t('validUntil')}----${t('roleDesc')}----${t('status')}`
+  ]
+
+  list.forEach(item => {
+    lines.push([
+      item.code,
+      formatValidityType(item.validityType),
+      item.count,
+      item.expireTime ? formatExportExpireTime(item.expireTime) : '',
+      item.roleName || '',
+      formatRegKeyStatus(item.status)
+    ].join('----'))
+  })
+
+  return lines.join('\n')
+}
+
+function getExportTitleKey(validityType) {
+  const map = {
+    month: 'exportMonthRegKeyTitle',
+    quarter: 'exportQuarterRegKeyTitle',
+    year: 'exportYearRegKeyTitle',
+    all: 'exportAllRegKeyTitle'
+  }
+  return map[validityType] || 'exportAllRegKeyTitle'
+}
+
+function getExportFileNameKey(validityType) {
+  const map = {
+    month: 'exportMonthRegKeyFile',
+    quarter: 'exportQuarterRegKeyFile',
+    year: 'exportYearRegKeyFile',
+    all: 'exportAllRegKeyFile'
+  }
+  return map[validityType] || 'exportAllRegKeyFile'
+}
+
+function formatExportExpireTime(expireTime) {
+  return tzDayjs(expireTime).format('YYYY-MM-DD HH:mm:ss')
+}
+
+function formatRegKeyStatus(status) {
+  const map = {
+    normal: t('normal'),
+    exhausted: t('exhausted'),
+    expired: t('expired')
+  }
+  return map[status] || status || ''
+}
+
 function deleteRegKey(regKey) {
   ElMessageBox.confirm(t('delConfirm', {msg: regKey.code}), {
     confirmButtonText: t('confirm'),
@@ -433,9 +644,22 @@ function resetForm() {
   addForm.expireTime = null
 }
 
+function resetBatchForm() {
+  batchForm.batchCount = 10
+  batchForm.count = 1
+  batchForm.roleId = null
+  batchForm.validityType = 'month'
+  batchForm.expireTime = null
+  batchForm.codeLength = 8
+}
+
 function openAdd() {
   genCode()
   showAdd.value = true
+}
+
+function openBatchAdd() {
+  showBatchAdd.value = true
 }
 
 </script>
@@ -566,6 +790,13 @@ function openAdd() {
   gap: 15px;
 }
 
+.form-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 :deep(.el-dialog) {
   width: 400px !important;
   @media (max-width: 440px) {
@@ -575,7 +806,7 @@ function openAdd() {
   }
 }
 
-.setting {
+.setting, .export-dropdown {
   cursor: pointer;
 }
 
