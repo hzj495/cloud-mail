@@ -7,7 +7,7 @@ import { formatDetailDate, toUtc } from '../utils/date-uitil';
 import userService from './user-service';
 import { t } from '../i18n/i18n.js';
 
-const REG_KEY_VALIDITY_TYPES = ['month', 'quarter', 'year'];
+const REG_KEY_VALIDITY_TYPES = ['test', 'month', 'quarter', 'year'];
 const REG_KEY_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789abcdefghijkmnopqrstuvwxyz';
 const MAX_BATCH_CREATE_COUNT = 1000;
 
@@ -217,6 +217,8 @@ const regKeyService = {
 		}
 
 		switch (validityType) {
+			case 'test':
+				return startTime.add(3, 'day').format('YYYY-MM-DD HH:mm:ss');
 			case 'month':
 				return startTime.add(1, 'month').format('YYYY-MM-DD HH:mm:ss');
 			case 'quarter':
