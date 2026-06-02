@@ -67,6 +67,13 @@
               {{ tzDayjs(props.row.createTime).format('YYYY-MM-DD HH:mm') }}
             </template>
           </el-table-column>
+          <el-table-column v-if="expireTimeShow" :label="$t('accountExpireTime')" min-width="165" prop="expireTime">
+            <template #default="props">
+              <el-tag disable-transitions :type="isExpiredUser(props.row) ? 'danger' : 'success'">
+                {{ formatUserExpireText(props.row) }}
+              </el-tag>
+            </template>
+          </el-table-column>
           <el-table-column v-if="statusShow" min-width="60px" :label="$t('tabStatus')" prop="status">
             <template #default="props">
               <el-tag disable-transitions v-if="props.row.isDel === 1" type="info">{{ $t('deleted') }}</el-tag>
@@ -245,6 +252,12 @@
             tzDayjs(userDetails.createTime).format('YYYY-MM-DD HH:mm')
           }}
         </div>
+        <div>
+          <span class="details-item-title">{{ $t('accountExpireTime') }}:</span>
+          <el-tag disable-transitions :type="isExpiredUser(userDetails) ? 'danger' : 'success'">
+            {{ formatUserExpireText(userDetails) }}
+          </el-tag>
+        </div>
         <div v-if="!typeShow"><span class="details-item-title">{{ $t('perm') }}:</span>
           {{ toRoleName(userDetails.type) }}
         </div>
@@ -405,6 +418,7 @@ const settingWidth = ref(null)
 const sendNumShow = ref(true)
 const accountNumShow = ref(true)
 const createTimeShow = ref(true)
+const expireTimeShow = ref(true)
 const statusShow = ref(true)
 const typeShow = ref(true)
 const receiveWidth = ref(null)
@@ -658,6 +672,22 @@ function formatterReceive(e) {
   }
 
   return 0
+}
+
+function isExpiredUser(user) {
+  return Boolean(user?.expireTime) && tzDayjs(user.expireTime).isBefore(tzDayjs())
+}
+
+function formatUserExpireText(user) {
+  if (!user?.expireTime) {
+    return t('unlimited')
+  }
+
+  if (isExpiredUser(user)) {
+    return t('expired')
+  }
+
+  return tzDayjs(user.expireTime).format('YYYY-MM-DD HH:mm')
 }
 
 function setStatusName(user) {
@@ -1025,6 +1055,7 @@ adjustWidth()
 function adjustWidth() {
   const width = window.innerWidth
   statusShow.value = width > 1090
+  expireTimeShow.value = width > 1240
   createTimeShow.value = width > 1367
   accountNumShow.value = width > 650
   sendNumShow.value = width > 685
