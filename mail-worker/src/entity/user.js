@@ -8,6 +8,7 @@ const user = sqliteTable('user', {
 	salt: text('salt').notNull(),
 	status: integer('status').default(0).notNull(),
 	createTime: text('create_time').default(sql`CURRENT_TIMESTAMP`),
+	expireTime: text('expire_time'),
 	activeTime: text('active_time'),
 	createIp: text('create_ip'),
 	activeIp: text('active_ip'),
