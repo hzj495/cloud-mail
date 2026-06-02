@@ -7,7 +7,7 @@ const zh = {
 	notExistDomain: '不存在的邮箱域名',
 	isDelAccount: '该邮箱已被注销',
 	isRegAccount: '该邮箱已被注册',
-	accountLimit: '添加邮箱数量到达限制',
+	accountLimit: '累计添加邮箱数量已达到权限身份限制，删除邮箱不会释放额度',
 	delMyAccount: '不可以删除自己的邮箱',
 	noUserAccount: '该邮箱不属于当前用户',
 	usernameLengthLimit: '用户名长度超出限制',
