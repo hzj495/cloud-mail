@@ -30,10 +30,11 @@ const userService = {
 			throw new BizError(t('authExpired'), 401);
 		}
 
-		const [account, roleRow, permKeys] = await Promise.all([
+		const [account, roleRow, permKeys, accountCreatedCount] = await Promise.all([
 			accountService.selectByEmailIncludeDel(c, userRow.email),
 			roleService.selectById(c, userRow.type),
-			userRow.email === c.env.admin ? Promise.resolve(['*']) : permService.userPermKeys(c, userId)
+			userRow.email === c.env.admin ? Promise.resolve(['*']) : permService.userPermKeys(c, userId),
+			accountService.countUserCreatedAccount(c, userId)
 		]);
 
 		const user = {};
@@ -41,6 +42,7 @@ const userService = {
 		user.sendCount = userRow.sendCount;
 		user.email = userRow.email;
 		user.expireTime = userRow.expireTime;
+		user.accountCreatedCount = accountCreatedCount || 0;
 		user.account = accountService.maskPopSecretTime(account);
 		user.name = account.name;
 		user.permKeys = permKeys;
