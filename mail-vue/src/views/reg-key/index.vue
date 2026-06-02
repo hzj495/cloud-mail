@@ -7,6 +7,7 @@
         <Icon class="icon" icon="material-symbols:download-rounded" width="22" height="22"/>
         <template #dropdown>
           <el-dropdown-menu>
+            <el-dropdown-item @click="exportRegKeys('test')">{{ $t('exportTestRegKey') }}</el-dropdown-item>
             <el-dropdown-item @click="exportRegKeys('month')">{{ $t('exportMonthRegKey') }}</el-dropdown-item>
             <el-dropdown-item @click="exportRegKeys('quarter')">{{ $t('exportQuarterRegKey') }}</el-dropdown-item>
             <el-dropdown-item @click="exportRegKeys('year')">{{ $t('exportYearRegKey') }}</el-dropdown-item>
@@ -87,6 +88,7 @@
           <el-option v-for="item in roleList" :label="item.name" :value="item.roleId" :key="item.roleId"/>
         </el-select>
         <el-select v-model="addForm.validityType" :placeholder="$t('accountValidity')">
+          <el-option :label="$t('validityTest')" value="test"/>
           <el-option :label="$t('validityMonth')" value="month"/>
           <el-option :label="$t('validityQuarter')" value="quarter"/>
           <el-option :label="$t('validityYear')" value="year"/>
@@ -108,6 +110,7 @@
           <el-option v-for="item in roleList" :label="item.name" :value="item.roleId" :key="item.roleId"/>
         </el-select>
         <el-select v-model="batchForm.validityType" :placeholder="$t('accountValidity')">
+          <el-option :label="$t('validityTest')" value="test"/>
           <el-option :label="$t('validityMonth')" value="month"/>
           <el-option :label="$t('validityQuarter')" value="quarter"/>
           <el-option :label="$t('validityYear')" value="year"/>
@@ -325,6 +328,7 @@ function formatUserExpireTime(row) {
 
 function formatValidityType(validityType) {
   const map = {
+    test: t('validityTest'),
     month: t('validityMonth'),
     quarter: t('validityQuarter'),
     year: t('validityYear')
@@ -588,6 +592,7 @@ function buildRegKeyExportContent(list, validityType) {
 
 function getExportTitleKey(validityType) {
   const map = {
+    test: 'exportTestRegKeyTitle',
     month: 'exportMonthRegKeyTitle',
     quarter: 'exportQuarterRegKeyTitle',
     year: 'exportYearRegKeyTitle',
@@ -598,6 +603,7 @@ function getExportTitleKey(validityType) {
 
 function getExportFileNameKey(validityType) {
   const map = {
+    test: 'exportTestRegKeyFile',
     month: 'exportMonthRegKeyFile',
     quarter: 'exportQuarterRegKeyFile',
     year: 'exportYearRegKeyFile',
