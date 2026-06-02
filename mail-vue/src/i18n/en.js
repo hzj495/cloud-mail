@@ -299,7 +299,7 @@ const en = {
     reqFailErrorMsg: 'Request failed. Try again later',
     message: 'Message',
     language: 'Language',
-    totalUserAccount: '{msg}',
+    totalUserAccount: '{used}/{total}',
     sendBanned: 'Banned',
     sendInternal: 'Only internal',
     wrote: 'wrote',
