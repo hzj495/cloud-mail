@@ -13,6 +13,11 @@ app.post('/register', async (c) => {
 	return c.json(result.ok(jwt));
 });
 
+app.post('/renew', async (c) => {
+	const data = await loginService.renew(c, await c.req.json());
+	return c.json(result.ok(data));
+});
+
 app.delete('/logout', async (c) => {
 	await loginService.logout(c, userContext.getUserId(c));
 	return c.json(result.ok());
