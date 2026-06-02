@@ -295,6 +295,24 @@ const userService = {
 
 	},
 
+	async renewExpireTime(c, params) {
+
+		const { userId, expireTime, regKeyId, type } = params;
+		const updateParams = { expireTime, regKeyId };
+
+		if (type) {
+			updateParams.type = type;
+		}
+
+		await orm(c)
+			.update(user)
+			.set(updateParams)
+			.where(eq(user.userId, userId))
+			.run();
+
+		await c.env.kv.delete(KvConst.AUTH_INFO + userId);
+	},
+
 	async incrUserSendCount(c, quantity, userId) {
 		await orm(c).update(user).set({
 			sendCount: sql`${user.sendCount}
