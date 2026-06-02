@@ -299,7 +299,7 @@ const zh = {
     reqFailErrorMsg: '请求失败，请稍后再试',
     message: '邮件详情',
     language: '系统语言',
-    totalUserAccount: '{msg} 个',
+    totalUserAccount: '{used}/{total} 个',
     sendBanned: '已禁用',
     sendInternal: '仅站内',
     wrote: '来信',
