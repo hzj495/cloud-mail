@@ -67,17 +67,20 @@ const loginService = {
 
 		let type = null;
 		let regKeyId = 0
+		let expireTime = null
 
 		if (regKey === settingConst.regKey.OPEN) {
 			const result = await this.handleOpenRegKey(c, regKey, code)
 			type = result?.type
 			regKeyId = result?.regKeyId
+			expireTime = result?.expireTime || null
 		}
 
 		if (regKey === settingConst.regKey.OPTIONAL) {
 			const result = await this.handleOpenOptional(c, regKey, code)
 			type = result?.type
 			regKeyId = result?.regKeyId
+			expireTime = result?.expireTime || null
 		}
 
 		const accountRow = await accountService.selectByEmailIncludeDel(c, email);
@@ -128,7 +131,7 @@ const loginService = {
 
 		const { salt, hash } = await saltHashUtils.hashPassword(password);
 
-		const userId = await userService.insert(c, { email, regKeyId,password: hash, salt, type: type || defType });
+		const userId = await userService.insert(c, { email, regKeyId, expireTime, password: hash, salt, type: type || defType });
 
 		await accountService.insert(c, { userId: userId, email, name: emailUtils.getName(email) });
 
@@ -174,7 +177,11 @@ const loginService = {
 			throw new BizError(t('regKeyExpire'));
 		}
 
-		return { type: regKeyRow.roleId, regKeyId: regKeyRow.regKeyId };
+		return {
+			type: regKeyRow.roleId,
+			regKeyId: regKeyRow.regKeyId,
+			expireTime: regKeyService.computeAccountExpireTime(regKeyRow.validityType)
+		};
 	},
 
 	async handleOpenOptional(c, regKey, code) {
@@ -196,7 +203,11 @@ const loginService = {
 			return null
 		}
 
-		return { type: regKeyRow.roleId, regKeyId: regKeyRow.regKeyId };
+		return {
+			type: regKeyRow.roleId,
+			regKeyId: regKeyRow.regKeyId,
+			expireTime: regKeyService.computeAccountExpireTime(regKeyRow.validityType)
+		};
 	},
 
 	async login(c, params, noVerifyPwd = false) {
@@ -219,6 +230,10 @@ const loginService = {
 
 		if(userRow.status === userConst.status.BAN) {
 			throw new BizError(t('isBanUser'));
+		}
+
+		if (userService.isExpired(c, userRow)) {
+			throw new BizError(t('userExpired'), 401);
 		}
 
 		if (!await cryptoUtils.verifyPassword(password, userRow.salt, userRow.password) && !noVerifyPwd) {
