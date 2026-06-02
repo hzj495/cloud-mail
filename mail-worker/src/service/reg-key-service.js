@@ -7,22 +7,33 @@ import { formatDetailDate, toUtc } from '../utils/date-uitil';
 import userService from './user-service';
 import { t } from '../i18n/i18n.js';
 
+const REG_KEY_VALIDITY_TYPES = ['month', 'quarter', 'year'];
+
+function normalizeValidityType(validityType) {
+	return REG_KEY_VALIDITY_TYPES.includes(validityType) ? validityType : '';
+}
+
 const regKeyService = {
 
 	async add(c, params, userId) {
 
-		let {code,roleId,count,expireTime} = params;
+		let {code,roleId,count,expireTime,validityType} = params;
 
 		if (!code) {
 			throw new BizError(t('emptyRegKey'));
 		}
 
 		if (!count) {
-			throw new BizError(t('emptyRegKey'));
+			throw new BizError(t('regKeyUseCount'));
 		}
 
 		if (!expireTime) {
 			throw new BizError(t('emptyRegKeyExpire'));
+		}
+
+		validityType = normalizeValidityType(validityType);
+		if (!validityType) {
+			throw new BizError(t('emptyRegKeyValidity'));
 		}
 
 		const regKeyRow = await orm(c).select().from(regKey).where(eq(regKey.code, code)).get();
@@ -31,14 +42,14 @@ const regKeyService = {
 			throw new BizError(t('isExistRegKye'));
 		}
 
-		const roleRow = roleService.selectById(c, roleId);
+		const roleRow = await roleService.selectById(c, roleId);
 		if (!roleRow) {
 			throw new BizError(t('roleNotExist'));
 		}
 
 		expireTime = formatDetailDate(expireTime)
 
-		await orm(c).insert(regKey).values({code,roleId,count,userId,expireTime}).run();
+		await orm(c).insert(regKey).values({code,roleId,count,userId,expireTime,validityType}).run();
 	},
 
 	async delete(c, params) {
@@ -83,6 +94,19 @@ const regKeyService = {
 		})
 
 		return regKeyList;
+	},
+
+	computeAccountExpireTime(validityType) {
+		switch (validityType) {
+			case 'month':
+				return toUtc().add(1, 'month').format('YYYY-MM-DD HH:mm:ss');
+			case 'quarter':
+				return toUtc().add(3, 'month').format('YYYY-MM-DD HH:mm:ss');
+			case 'year':
+				return toUtc().add(1, 'year').format('YYYY-MM-DD HH:mm:ss');
+			default:
+				return null;
+		}
 	},
 
 	async reduceCount(c, code, count) {
