@@ -36,6 +36,10 @@
                 <el-tag>{{ item.roleName }}</el-tag>
               </div>
               <div class="info-left-item">
+                <div>{{ $t('accountValidity') }}：</div>
+                <el-tag>{{ formatValidityType(item.validityType) }}</el-tag>
+              </div>
+              <div class="info-left-item">
                 <div>{{ $t('validUntil') }}：</div>
                 <div v-if="item.expireTime">{{ formatExpireTime(item.expireTime) }}</div>
                 <el-tag v-else type="danger">{{ $t('expired') }}</el-tag>
@@ -70,6 +74,11 @@
         <el-select v-model="addForm.roleId" :placeholder="$t('roleDesc')">
           <el-option v-for="item in roleList" :label="item.name" :value="item.roleId" :key="item.roleId"/>
         </el-select>
+        <el-select v-model="addForm.validityType" :placeholder="$t('accountValidity')">
+          <el-option :label="$t('validityMonth')" value="month"/>
+          <el-option :label="$t('validityQuarter')" value="quarter"/>
+          <el-option :label="$t('validityYear')" value="year"/>
+        </el-select>
         <el-date-picker
             v-model="addForm.expireTime"
             type="date"
@@ -89,7 +98,9 @@
         <el-table-column :min-width="emailColumnWidth" property="email" :label="$t('user')"
                          :show-overflow-tooltip="true"/>
         <el-table-column :width="createTimeColumnWidth" :formatter="formatUserCreateTime" property="createTime"
-                         :label="$t('date')" fixed="right" :show-overflow-tooltip="true"/>
+                         :label="$t('date')" :show-overflow-tooltip="true"/>
+        <el-table-column :width="createTimeColumnWidth" :formatter="formatUserExpireTime" property="expireTime"
+                         :label="$t('accountExpireTime')" fixed="right" :show-overflow-tooltip="true"/>
       </el-table>
     </el-dialog>
   </div>
@@ -135,6 +146,7 @@ const addForm = reactive({
   code: '',
   count: 1,
   roleId: null,
+  validityType: 'month',
   expireTime: null
 })
 
@@ -235,6 +247,34 @@ function formatExpireTime(expireTime) {
   }
 }
 
+function formatUserExpireTime(row) {
+  if (!row.expireTime) {
+    return t('unlimited')
+  }
+  const expireDate = tzDayjs(row.expireTime);
+  const currentYear = dayjs().year();
+  const expireYear = expireDate.year();
+
+  if (settingStore.lang === 'en') {
+    return expireYear === currentYear
+        ? expireDate.format('MMM D, HH:mm')
+        : expireDate.format('MMM D, YYYY HH:mm');
+  }
+
+  return expireYear === currentYear
+      ? expireDate.format('M月D日 HH:mm')
+      : expireDate.format('YYYY年M月D日 HH:mm');
+}
+
+function formatValidityType(validityType) {
+  const map = {
+    month: t('validityMonth'),
+    quarter: t('validityQuarter'),
+    year: t('validityYear')
+  }
+  return map[validityType] || t('unknown')
+}
+
 function refresh() {
   params.code = null
   getList(true)
@@ -310,7 +350,7 @@ function submit() {
 
   if (!addForm.code) {
     ElMessage({
-      message: $('emptyRegKeyMsg'),
+      message: t('emptyRegKeyMsg'),
       type: "error",
       plain: true
     })
@@ -320,6 +360,15 @@ function submit() {
   if (!addForm.roleId) {
     ElMessage({
       message: t('emptyRole'),
+      type: "error",
+      plain: true
+    })
+    return
+  }
+
+  if (!addForm.validityType) {
+    ElMessage({
+      message: t('emptyValidityMsg'),
       type: "error",
       plain: true
     })
@@ -378,6 +427,10 @@ function deleteRegKey(regKey) {
 
 function resetForm() {
   addForm.code = ''
+  addForm.count = 1
+  addForm.roleId = null
+  addForm.validityType = 'month'
+  addForm.expireTime = null
 }
 
 function openAdd() {
