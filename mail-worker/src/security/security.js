@@ -11,7 +11,6 @@ import app from '../hono/hono';
 const exclude = [
 	'/login',
 	'/register',
-	'/renew',
 	'/oss',
 	'/setting/websiteConfig',
 	'/webhooks',
@@ -20,7 +19,8 @@ const exclude = [
 	'/telegram',
 	'/test',
 	'/oauth',
-	'/pop3'
+	'/pop3',
+	'/smtp'
 ];
 
 const requirePerms = [
@@ -59,12 +59,10 @@ const requirePerms = [
 	'/user/deleteAccount',
 	'/user/allAccount',
 	'/regKey/add',
-	'/regKey/batchAdd',
 	'/regKey/list',
 	'/regKey/delete',
 	'/regKey/clearNotUse',
-	'/regKey/history',
-	'/regKey/export'
+	'/regKey/history'
 ];
 
 const premKey = {
@@ -90,8 +88,8 @@ const premKey = {
 	'setting:query': ['/setting/query'],
 	'setting:set': ['/setting/set', '/setting/setBackground','/setting/deleteBackground','/setting/setBlacklist'],
 	'analysis:query': ['/analysis/echarts'],
-	'reg-key:add': ['/regKey/add','/regKey/batchAdd'],
-	'reg-key:query': ['/regKey/list','/regKey/history','/regKey/export'],
+	'reg-key:add': ['/regKey/add'],
+	'reg-key:query': ['/regKey/list','/regKey/history'],
 	'reg-key:delete': ['/regKey/delete','/regKey/clearNotUse'],
 };
 
@@ -135,10 +133,6 @@ app.use('*', async (c, next) => {
 
 	if (!authInfo.tokens.includes(token)) {
 		throw new BizError(t('authExpired'), 401);
-	}
-
-	if (userService.isExpired(c, authInfo.user)) {
-		throw new BizError(t('userExpired'), 401);
 	}
 
 	const permIndex = requirePerms.findIndex(item => {
