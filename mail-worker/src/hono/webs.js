@@ -21,4 +21,5 @@ import '../api/public-api'
 import '../api/telegram-api'
 import '../api/oauth-api'
 import '../api/pop3-api'
+import '../api/smtp-api'
 export default app;
