@@ -143,7 +143,7 @@
             type="warning"
             show-icon
             :closable="false"
-            title="批量生成后会返回 邮箱——POP密钥 文本，请立即复制或下载保存，POP密钥关闭后不能再次查看。"
+            title="批量生成后会返回 邮箱----POP密钥 文本，请立即复制或下载保存，POP密钥关闭后不能再次查看。"
         />
         <el-button class="btn" type="primary" @click="submitBatchAdd" :loading="batchAddLoading">开始批量生成</el-button>
       </div>
@@ -153,7 +153,7 @@
           type="warning"
           show-icon
           :closable="false"
-          title="POP密钥只会在本次生成/重置时显示一次，请立即下载保存。格式：邮箱——POP密钥。"
+          title="POP密钥只会在本次生成/重置时显示一次，请立即下载保存。格式：邮箱----POP密钥。"
       />
       <el-input class="batch-result-textarea" v-model="batchResultText" type="textarea" :rows="12" readonly />
       <div class="batch-result-actions">
