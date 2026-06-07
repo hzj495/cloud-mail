@@ -65,7 +65,7 @@ const accountService = {
 		if (userRow.email !== c.env.admin) {
 
 			if (roleRow.accountCount > 0) {
-				const userAccountCount = await accountService.countUserAccount(c, userId)
+				const userAccountCount = await accountService.countUserCreatedAccount(c, userId)
 				if(userAccountCount >= roleRow.accountCount) throw new BizError(t('accountLimit'), 403);
 			}
 
@@ -162,7 +162,7 @@ const accountService = {
 
 		if (userRow.email !== c.env.admin) {
 			if (roleRow.accountCount > 0) {
-				const userAccountCount = await accountService.countUserAccount(c, userId);
+				const userAccountCount = await accountService.countUserCreatedAccount(c, userId);
 				if (userAccountCount + createCount > roleRow.accountCount) {
 					throw new BizError(t('accountLimit'), 403);
 				}
@@ -327,6 +327,11 @@ const accountService = {
 	async countUserAccount(c, userId) {
 		const { num } = await orm(c).select({num: count()}).from(account).where(and(eq(account.userId, userId),eq(account.isDel, isDel.NORMAL))).get();
 		return num;
+	},
+
+	async countUserCreatedAccount(c, userId) {
+		const { num } = await orm(c).select({num: count()}).from(account).where(eq(account.userId, userId)).get();
+		return num || 0;
 	},
 
 	async restoreByEmail(c, email) {
