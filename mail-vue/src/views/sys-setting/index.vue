@@ -633,12 +633,23 @@
           </div>
         </template>
       </el-dialog>
-      <el-dialog class="resend-table" v-model="showResendList" :title="$t('resendTokenList')">
-        <el-table :data="resendList">
+      <el-dialog class="resend-table" v-model="showResendList" :title="$t('resendTokenList')" width="760">
+        <el-table :data="resendList" empty-text="暂无Resend Token">
           <el-table-column :min-width="emailColumnWidth" property="key" :label="$t('domain')"
                            :show-overflow-tooltip="true"/>
-          <el-table-column :width="tokenColumnWidth" property="value" label="Token" fixed="right"
-                           :show-overflow-tooltip="true"/>
+          <el-table-column :min-width="tokenColumnWidth" property="value" label="Token">
+            <template #default="{ row }">
+              <div class="resend-token-cell">
+                <span class="resend-token-text">{{ row.value }}</span>
+                <el-button size="small" type="primary" link @click="copyResendToken(row.value)">复制</el-button>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column width="100" label="操作" fixed="right">
+            <template #default="{ row }">
+              <el-button size="small" type="danger" link :loading="settingLoading" @click="deleteResendToken(row.key)">删除</el-button>
+            </template>
+          </el-table-column>
         </el-table>
       </el-dialog>
       <el-dialog v-model="regVerifyCountShow" :title="$t('rulesVerifyTitle',{count: regVerifyCount})"
@@ -1443,6 +1454,39 @@ function saveResendToken() {
   editSetting(settingForm)
 }
 
+async function copyResendToken(token) {
+  try {
+    await navigator.clipboard.writeText(token);
+    ElMessage({
+      message: t('copySuccessMsg'),
+      type: 'success',
+      plain: true
+    })
+  } catch (e) {
+    ElMessage({
+      message: t('copyFailMsg'),
+      type: 'error',
+      plain: true
+    })
+  }
+}
+
+function deleteResendToken(domain) {
+  if (settingLoading.value) return
+  ElMessageBox.confirm(`确定删除 ${domain} 的 Resend Token 吗？删除后该域名将不能再给站外邮箱发信。`, {
+    confirmButtonText: t('confirm'),
+    cancelButtonText: t('cancel'),
+    type: 'warning'
+  }).then(() => {
+    const settingForm = {
+      resendTokens: {
+        [domain]: ''
+      }
+    }
+    editSetting(settingForm)
+  }).catch(() => {})
+}
+
 function backupSetting() {
   const settingForm = {...setting.value}
   delete settingForm.resendTokens
@@ -2021,9 +2065,28 @@ form .el-button {
   min-height: 28px;
 }
 
+
+
+.resend-token-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.resend-token-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 </style>
 
 <style>
 .el-popper.is-dark {
 }
+
 </style>
