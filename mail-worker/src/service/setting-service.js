@@ -82,11 +82,19 @@ const settingService = {
 
 	async get(c, showSiteKey = false) {
 
-		const [settingRow, recordList] = await Promise.all([
+		const [rawSettingRow, recordList] = await Promise.all([
 			await this.query(c),
 			verifyRecordService.selectListByIP(c)
 		]);
 
+		// query() 返回的配置对象会被缓存到本次请求上下文里，get() 里展示用的脱敏处理
+		// 不能直接修改原对象，否则后续 set() 合并 resendTokens 时可能拿到脱敏后的 token。
+		const settingRow = {
+			...rawSettingRow,
+			resendTokens: { ...(rawSettingRow.resendTokens || {}) },
+			domainList: Array.isArray(rawSettingRow.domainList) ? [...rawSettingRow.domainList] : rawSettingRow.domainList,
+			emailPrefixFilter: Array.isArray(rawSettingRow.emailPrefixFilter) ? [...rawSettingRow.emailPrefixFilter] : rawSettingRow.emailPrefixFilter
+		};
 
 		if (!showSiteKey) {
 			settingRow.siteKey = settingRow.siteKey ? `${settingRow.siteKey.slice(0, 6)}******` : null;
@@ -94,9 +102,7 @@ const settingService = {
 
 		settingRow.secretKey = settingRow.secretKey ? `${settingRow.secretKey.slice(0, 6)}******` : null;
 
-		Object.keys(settingRow.resendTokens).forEach(key => {
-			settingRow.resendTokens[key] = `${settingRow.resendTokens[key].slice(0, 12)}******`;
-		});
+		// Resend Token 用于管理员核对和删除错误配置，这里完整返回给已登录管理员页面展示。
 
 		settingRow.s3AccessKey = settingRow.s3AccessKey ? `${settingRow.s3AccessKey.slice(0, 12)}******` : null;
 		settingRow.s3SecretKey = settingRow.s3SecretKey ? `${settingRow.s3SecretKey.slice(0, 12)}******` : null;
