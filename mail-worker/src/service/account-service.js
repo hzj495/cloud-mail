@@ -231,11 +231,12 @@ const accountService = {
 
 	async list(c, params, userId) {
 
-		let { accountId, size, lastSort } = params;
+		let { accountId, size, lastSort, keyword } = params;
 
 		accountId = Number(accountId);
 		size = Number(size);
 		lastSort = Number(lastSort);
+		keyword = String(keyword || '').trim();
 
 		if (size > 30) {
 			size = 30;
@@ -249,18 +250,23 @@ const accountService = {
 			lastSort = 9999999999;
 		}
 
-		const list = await orm(c).select().from(account).where(
-			and(
-				eq(account.userId, userId),
-				eq(account.isDel, isDel.NORMAL),
-					or(
-						lt(account.sort, lastSort),
-						and(
-							eq(account.sort, lastSort),
-							gt(account.accountId, accountId)
-						)
-					))
+		const conditions = [
+			eq(account.userId, userId),
+			eq(account.isDel, isDel.NORMAL),
+			or(
+				lt(account.sort, lastSort),
+				and(
+					eq(account.sort, lastSort),
+					gt(account.accountId, accountId)
 				)
+			)
+		];
+
+		if (keyword) {
+			conditions.push(sql`LOWER(${account.email}) LIKE ${'%' + keyword.toLowerCase() + '%'}`);
+		}
+
+		const list = await orm(c).select().from(account).where(and(...conditions))
 			.orderBy(desc(account.sort), asc(account.accountId))
 			.limit(size)
 			.all();
