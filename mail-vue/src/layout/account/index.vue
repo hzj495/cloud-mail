@@ -6,6 +6,20 @@
       <el-button v-perm="'account:add'" class="batch-btn" size="small" type="primary" @click="openBatchAdd">批量生成</el-button>
       <el-button v-if="hasPerm('account:query')" class="batch-btn" size="small" @click="batchExportPopSecret">导出POP密钥</el-button>
     </div>
+    <div v-if="hasPerm('account:query')" class="account-search">
+      <el-input
+          v-model="searchKeyword"
+          class="account-search-input"
+          size="small"
+          clearable
+          placeholder="搜索邮箱"
+          @keyup.enter="searchNow"
+      >
+        <template #prefix>
+          <Icon icon="ion:search-outline" width="16" height="16"/>
+        </template>
+      </el-input>
+    </div>
     <el-scrollbar class="scrollbar" ref="scrollbarRef">
       <div v-infinite-scroll="getAccountList" :infinite-scroll-distance="600" :infinite-scroll-immediate="false">
         <el-card class="item" :class="itemBg(item.accountId)" v-for="(item, index) in accounts" :key="item.accountId"
@@ -227,6 +241,7 @@ const showAdd = ref(false)
 const addLoading = ref(false);
 const domainList = computed(() => settingStore.domainList)
 const accounts = reactive([])
+const searchKeyword = ref('')
 const noLoading = ref(false)
 const loading = ref(false)
 const followLoading = ref(false);
@@ -258,6 +273,8 @@ const botJsError = ref(false)
 let verifyToken = ''
 let verifyErrorCount = 0
 let first = true
+let searchTimer = null
+let listRequestVersion = 0
 const addForm = reactive({
   email: '',
   suffix: settingStore.domainList[0]
@@ -274,7 +291,9 @@ if (hasPerm('account:query')) {
 }
 
 watch(() => accountStore.changeUserAccountName, () => {
-  accounts[0].name = accountStore.changeUserAccountName
+  if (accounts[0]) {
+    accounts[0].name = accountStore.changeUserAccountName
+  }
 })
 
 watch(() => settingStore.domainList, (list) => {
@@ -285,6 +304,13 @@ watch(() => settingStore.domainList, (list) => {
     batchAddForm.suffix = list[0]
   }
 }, {immediate: true})
+
+watch(searchKeyword, () => {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    resetAccountList()
+  }, 250)
+})
 
 
 const openSelect = () => {
@@ -414,19 +440,29 @@ function remove(account) {
   });
 }
 
-function refresh() {
-  if (loading.value) {
-    return
-  }
+function resetAccountList() {
+  listRequestVersion++
   loading.value = false
   followLoading.value = false
   noLoading.value = false
   queryParams.accountId = 0
   queryParams.lastSort = null
   getSkeletonRows();
-  scrollbarRef.value.setScrollTop(0)
+  scrollbarRef.value?.setScrollTop?.(0)
   accounts.splice(0, accounts.length)
   getAccountList()
+}
+
+function searchNow() {
+  clearTimeout(searchTimer)
+  resetAccountList()
+}
+
+function refresh() {
+  if (loading.value) {
+    return
+  }
+  resetAccountList()
 }
 
 function changeAccount(account) {
@@ -483,7 +519,11 @@ function submitBatchAdd() {
   ).then(data => {
     batchAddShow.value = false
     if (Array.isArray(data.created) && data.created.length > 0) {
-      accounts.unshift(...data.created)
+      if (searchKeyword.value.trim()) {
+        resetAccountList()
+      } else {
+        accounts.unshift(...data.created)
+      }
     }
     userStore.refreshUserInfo()
     showBatchResult(data.text || '')
@@ -623,8 +663,12 @@ function getAccountList() {
 
   const accountId = accounts.length > 0 ? accounts.at(-1).accountId : 0;
   const lastSort = accounts.length > 0 ? accounts.at(-1).sort : null;
+  const keyword = searchKeyword.value.trim();
+  const requestVersion = listRequestVersion;
 
-  accountList(accountId, queryParams.size, lastSort).then(async list => {
+  accountList(accountId, queryParams.size, lastSort, keyword).then(async list => {
+
+    if (requestVersion !== listRequestVersion) return;
 
     let end = Date.now();
     let duration = end - start;
@@ -632,10 +676,12 @@ function getAccountList() {
       await sleep(300 - duration)
     }
 
+    if (requestVersion !== listRequestVersion) return;
+
     if (list.length < queryParams.size) {
       noLoading.value = true
     }
-    if (accounts.length === 0) {
+    if (accounts.length === 0 && list.length > 0 && !keyword) {
       accountStore.currentAccount = list[0]
     }
 
@@ -645,6 +691,7 @@ function getAccountList() {
     followLoading.value = false
     first = false
   }).catch(() => {
+    if (requestVersion !== listRequestVersion) return;
     loading.value = false
     followLoading.value = false
   })
@@ -710,7 +757,11 @@ function submit() {
     addLoading.value = false
     showAdd.value = false
     addForm.email = ''
-    accounts.push(account)
+    if (searchKeyword.value.trim()) {
+      resetAccountList()
+    } else {
+      accounts.push(account)
+    }
     verifyToken = ''
     settingStore.settings.addVerifyOpen = account.addVerifyOpen
     ElMessage({
@@ -820,12 +871,25 @@ path[fill="#ffdda1"] {
     }
   }
 
+  .account-search {
+    height: 42px;
+    display: flex;
+    align-items: center;
+    padding: 6px 10px;
+    box-sizing: border-box;
+    box-shadow: var(--header-actions-border);
+
+    .account-search-input {
+      width: 100%;
+    }
+  }
+
   .scrollbar {
     width: 100%;
-    height: calc(100% - 38px);
+    height: calc(100% - 80px);
     overflow: auto;
     @media (max-width: 767px) {
-      height: calc(100% - 98px);
+      height: calc(100% - 140px);
     }
 
     .empty {
