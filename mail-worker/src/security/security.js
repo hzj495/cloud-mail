@@ -7,6 +7,7 @@ import userService from '../service/user-service';
 import permService from '../service/perm-service';
 import { t } from '../i18n/i18n'
 import app from '../hono/hono';
+import mailboxService from '../service/mailbox-service';
 
 const exclude = [
 	'/login',
@@ -96,6 +97,17 @@ const premKey = {
 app.use('*', async (c, next) => {
 
 	const path = c.req.path;
+	// Mailbox tokens never inherit the owner/admin role, including on public API routes.
+	const presentedToken = c.req.header(constant.TOKEN_HEADER);
+	const mailboxClaims = presentedToken ? await jwtUtils.verifyToken(c, presentedToken) : null;
+	if (mailboxClaims?.scope === 'mailbox') {
+		if (c.req.method === 'GET' && path === '/setting/websiteConfig') return await next();
+		if (!mailboxService.isAllowed(c.req.method, path)) throw new BizError('临时邮箱只允许查看收件箱和修改密码',403);
+		c.set('mailbox', await mailboxService.authenticate(c, mailboxClaims));
+		c.header('Cache-Control','no-store');
+		return await next();
+	}
+	if (path.startsWith('/mailbox')) throw new BizError('请使用临时邮箱登录',401);
 
 	const index = exclude.findIndex(item => {
 		return path.startsWith(item);
@@ -116,9 +128,7 @@ app.use('*', async (c, next) => {
 	}
 
 
-	const jwt = c.req.header(constant.TOKEN_HEADER);
-
-	const result = await jwtUtils.verifyToken(c, jwt);
+	const result = mailboxClaims;
 
 	if (!result) {
 		throw new BizError(t('authExpired'), 401);
