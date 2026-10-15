@@ -19,6 +19,7 @@ import dayjs from 'dayjs';
 import { toUtc } from '../utils/date-uitil';
 import { t } from '../i18n/i18n.js';
 import verifyRecordService from './verify-record-service';
+import mailboxService from './mailbox-service';
 
 const loginService = {
 
@@ -202,6 +203,7 @@ const loginService = {
 		const userRow = await userService.selectByEmailIncludeDel(c, email);
 
 		if (!userRow) {
+			if (!noVerifyPwd) return mailboxService.login(c, email, password);
 			throw new BizError(t('notExistUser'));
 		}
 
