@@ -189,6 +189,7 @@
 
 <script setup>
 import router from "@/router";
+import {isMailboxSession} from '@/utils/mailbox-session.js';
 import {computed, nextTick, reactive, ref} from "vue";
 import {login, register, renew} from "@/request/login.js";
 import {websiteConfig} from "@/request/setting.js";
@@ -466,6 +467,12 @@ const submit = () => {
 
 async function saveToken(token) {
   localStorage.setItem('token', token)
+  if (isMailboxSession(token)) {
+    await router.replace({name:'mailbox'});
+    oauthLoading.value = false;
+    bindLoading.value = false;
+    return;
+  }
   refreshWebsiteConfig()
   const user = await loginUserInfo();
   accountStore.currentAccountId = user.account.accountId;
