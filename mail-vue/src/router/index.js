@@ -3,8 +3,10 @@ import NProgress from 'nprogress';
 import {useUiStore} from "@/store/ui.js";
 import {useSettingStore} from "@/store/setting.js";
 import {cvtR2Url} from "@/utils/convert.js";
+import {isMailboxSession} from '@/utils/mailbox-session.js';
 
 const routes = [
+    {path:'/mailbox',name:'mailbox',component:() => import('@/views/mailbox/index.vue')},
     {
         path: '/',
         name: 'layout',
@@ -99,6 +101,9 @@ router.beforeEach((to, from, next) => {
     }
 
     const token = localStorage.getItem('token')
+
+    if (token && isMailboxSession(token) && to.name !== 'mailbox') return next({name:'mailbox'});
+    if (token && !isMailboxSession(token) && to.name === 'mailbox') return next({name:'layout'});
 
     if (!token && to.name !== 'login') {
         return next({name: 'login'})
