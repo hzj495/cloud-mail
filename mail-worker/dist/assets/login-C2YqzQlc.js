@@ -1,0 +1,1 @@
+import{h as r}from"./index-LsWL0xcN.js";function n(t,e){return r.post("/login",{email:t,password:e})}function s(){return r.delete("/logout")}function i(t){return r.post("/register",t)}function u(t){return r.post("/renew",t)}export{n as a,u as b,s as l,i as r};
