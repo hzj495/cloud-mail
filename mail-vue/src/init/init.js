@@ -6,6 +6,7 @@ import {permsToRouter} from "@/perm/perm.js";
 import router from "@/router";
 import {websiteConfig} from "@/request/setting.js";
 import i18n from "@/i18n/index.js";
+import {isMailboxSession} from '@/utils/mailbox-session.js';
 
 export async function init() {
     document.title = '\u200B'
@@ -25,7 +26,7 @@ export async function init() {
 
     let setting = null;
 
-    if (token) {
+    if (token && !isMailboxSession(token)) {
         const userPromise = loginUserInfo().catch(e => {
             console.error(e);
             return null;
